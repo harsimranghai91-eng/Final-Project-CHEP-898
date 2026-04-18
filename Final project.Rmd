@@ -1,0 +1,915 @@
+---
+title: "Final Project"
+author: "Harsimran Ghai"
+date: "2026-04-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction to the project
+Myocardial infarction occurs due to decrease in blood supply to the myocardium (Heart Muscles), commonly due to obstruction in the coronary arteries. The risk factors for MI are as follows: Smoking, alcohol intake, sociodemographic factors, diet, increase level of homocysteine, diabetes, hypertension, high cholesterol, sedentary lifestyle, obesity. The global prevalence of MI is 3.8% for people age  less than 60 and 9.5% for people greater than 60 years of age.
+
+# Objectives of this study 
+The main objective of this study is to create different predictive models for predicting myocardial infarction (Heart attack). The best machine learning model will be selected based on different criterias (Refer to model selection in methodology section)
+
+# Methodology
+
+## dataset
+Heart disease dataset from kaggle was used for this project. The link to the project is as follows:https://www.kaggle.com/datasets/ankushpanday2/heart-attack-risk-dataset-of-china. This dataset is based on chinese population and consist of 239266 observations and consist of 28 features (Predictors).
+
+## Statistical methods
+### machine Learning models
+Three different classification machine learning models will be created that is logistic regression, random forest and artificial neural network (Single layer and two layer).The reason behind using random forest rather than decision tree is that decision tree even though easy to interpret tend to underperform in comparison to logistics regression models, that why ensemble method (random forest) is used.
+
+### Validation of the models
+Ten fold cross validation approach will be used to test the trained model. The reason behind using 10-fold cross validation in comparison to the validation set approach is is that 10-fold cross validation has lower variance in comparison to the validation set as every observation is used for validation and training and this approach is better use of the dataset. 
+
+### Model comparison
+The performance of each model will be compared using the following criteria : Accuracy, sensitivity, specificity, ROC-AUC and F1 Score. The model with the high score for the parameters will be selected as the best predictive model.
+
+### Variable Information
+
+#### Dependent Variable
+
+1. **Heart attack**  
+    Binary: "Yes" = no heart attack, "No" = heart attack
+
+#### Independent Variables
+
+1. **Age** – Continuous
+2. **Blood Pressure** – Continuous
+3. **CVD Risk Score** – Continuous
+4. **Hypertension** – Binary
+5. **Diabetes** – Binary
+6. **Obesity** – Binary
+7. **Cholesterol** – Categorical (High, Normal, Low)
+8. **Air Pollution Exposure** – Categorical (High, Medium, Low)
+9. **Physical Activity** – Categorical (High, Medium, Low)
+10. **Diet Score** – Categorical (Poor, Moderate, Healthy)
+11. **Stress Level** – Categorical (Low, Medium, High)
+12. **Alcohol Consumption** – Binary
+13. **Family History CVD** – Binary
+14. **Healthcare Access** – Categorical (Poor, Moderate, Good)
+15. **Rural or Urban** – Binary
+16. **Hospital Availability** – Categorical (Low, Medium, High)
+17. **TCM Use** – Binary
+18. **Employment Status** – Categorical (Employed, Unemployed, Retired)
+19. **Education Level** – Categorical (None, Primary, Secondary, Higher)
+20. **Income Level** – Categorical (Low, Middle, High)
+21. **Chronic Kidney Disease** – Binary
+22. **Previous Heart Attack** – Binary
+
+# Data Wrangling
+
+## Loading the Data
+```{r}
+data<-read.csv("heart_attack_china.csv")
+```
+
+## Loading the packages
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(reportRmd)
+library(sjPlot)
+library(plotly)
+library(psych)
+library(parallel)
+library(finalfit)
+library(gtsummary)
+library(mlbench)
+library(vip)
+library(rsample)
+library(tune)
+library(recipes)
+library(yardstick)
+library(parsnip)
+library(glmnet)
+library(themis)
+library(corrr)
+library(performance)
+library(utils)
+library(see)
+library(forestmodel)
+```
+
+## Taking a look into data set
+
+```{r}
+glimpse(data)
+```
+
+## Checking duplicate observations
+
+```{r}
+sum(duplicated(data))
+```
+
+No duplicated observation were observed in this dataset.
+
+## Checking the missing data
+
+```{r}
+any(is.na(data))
+```
+No missing data was found in this data set, so we don't need to do anything for the missing data.
+
+## Checking the structure of the data set
+
+```{r}
+str(data)
+```
+
+## Changing the Structure of variables
+
+```{r}
+data <- data%>%mutate(across(c( Gender,
+                                Smoking_Status,
+                                Hypertension,
+                                Diabetes,
+                                Obesity,
+                                Cholesterol_Level,
+                                Air_Pollution_Exposure,
+                                Physical_Activity,
+                                Diet_Score,
+                                Stress_Level,
+                                Alcohol_Consumption,
+                                Family_History_CVD,
+                                Healthcare_Access,
+                                Rural_or_Urban,
+                                Hospital_Availability,
+                                TCM_Use,
+                                Employment_Status,
+                                Education_Level,
+                                Income_Level,
+                                Chronic_Kidney_Disease,
+                                Previous_Heart_Attack,
+                                Heart_Attack
+                            
+),~ as.factor(.)))
+```
+
+## Descriptive Analysis
+
+```{r}
+rm_covsum(
+  data = data,
+                        covs = c('Age',
+                                'Blood_Pressure',
+                                'CVD_Risk_Score',
+                                'Hypertension',
+                                'Diabetes',
+                                'Obesity',
+                                'Cholesterol_Level',
+                                'Air_Pollution_Exposure',
+                                'Physical_Activity',
+                                'Diet_Score',
+                                'Stress_Level',
+                                'Alcohol_Consumption',
+                                'Family_History_CVD',
+                                'Healthcare_Access',
+                                'Rural_or_Urban',
+                                'Hospital_Availability',
+                                'TCM_Use',
+                                'Employment_Status',
+                                'Education_Level',
+                                'Income_Level',
+                                'Chronic_Kidney_Disease',
+                                'Previous_Heart_Attack',
+                                'Heart_Attack')
+)
+```
+
+## Bar Graphs
+
+```{r}
+ggplot(data, aes(x = Diabetes, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Diabetes by Heart Attack",
+    x = "Diabetes",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x =Hypertension , fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Hypertension by Heart Attack",
+    x = "Hypertension",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x =Obesity , fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Obesity by Heart Attack",
+    x = "Obesity",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x =Cholesterol_Level , fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Cholesterol Level by Heart Attack ",
+    x = "Cholesterol Level",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Air_Pollution_Exposure, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Air Pollution Exposure by Heart Attack",
+    x = "Air Pollution Exposure",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Physical_Activity, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Physical Activity by Heart Attack",
+    x = "Physical Activity",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Diet_Score, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Diet_Score by Heart Attack",
+    x = "Diet Score",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Stress_Level, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Stress_Level by Heart Attack",
+    x = "Stress Level",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Alcohol_Consumption, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Alcohol_Consumption by Heart Attack",
+    x = "Alcohol Consumption",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Family_History_CVD, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Family History CVD by Heart Attack",
+    x = "Family History CVD",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal() 
+```
+
+```{r}
+ggplot(data, aes(x = Healthcare_Access, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Healthcare Access by Heart Attack",
+    x = "Healthcare Access",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Rural_or_Urban, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Rural or Urban by Heart Attack",
+    x = "Rural or Urban",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal() 
+```
+
+```{r}
+ggplot(data, aes(x = Hospital_Availability, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Hospital Availability by Heart Attack",
+    x = "Hospital Availability",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal() 
+```
+
+```{r}
+ggplot(data, aes(x = TCM_Use, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "TCM_Use by Heart Attack",
+    x = "TCM Use",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal() 
+```
+
+```{r}
+ggplot(data, aes(x = Employment_Status, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Employment Status by Heart Attack",
+    x = "Employment Status",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal() 
+```
+
+```{r}
+ggplot(data, aes(x = Education_Level, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Education Level by Heart Attack",
+    x = "Education Level",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal() 
+```
+
+```{r}
+ggplot(data, aes(x = Income_Level, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Income Level by Heart Attack",
+    x = "Income Level",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal() 
+```
+
+```{r}
+ggplot(data, aes(x = Chronic_Kidney_Disease, fill = Heart_Attack)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Chronic Kidney Disease by Heart Attack",
+    x = "Chronic Kidney Disease",
+    y = "Count",
+    fill = "Heart Attack"
+  ) +
+  theme_minimal() 
+```
+
+```{r}
+ggplot(data, aes(x = Heart_Attack, y = Age)) +
+  geom_boxplot() +
+  labs(
+    x = "Heart Attack",
+    y = "Age",
+    title = "Distribution of Age by Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Heart_Attack, y = Blood_Pressure)) +
+  geom_boxplot() +
+  labs(
+    x = "Heart Attack",
+    y = "Blood Pressure",
+    title = "Distribution of Blood Pressure by Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(data, aes(x = Heart_Attack, y = CVD_Risk_Score)) +
+  geom_boxplot() +
+  labs(
+    x = "Heart Attack",
+    y = "CVD Risk Scores",
+    title = "Distribution of CVD Risk Scores by Heart Attack"
+  ) +
+  theme_minimal()
+```
+
+# Machine Learning Models
+
+## Logistic Regression
+
+### Loading the packages
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(sjPlot)
+library(finalfit)
+library(knitr)
+library(gtsummary)
+library(mlbench)
+library(vip)
+library(rsample)
+library(tune)
+library(recipes)
+library(yardstick)
+library(parsnip)
+library(glmnet)
+library(themis)
+library(microbenchmark)
+```
+
+## Data Split
+
+```{r}
+set.seed(10)
+
+data_split <- initial_split(data, prop = 0.70, strata = Heart_Attack)
+
+train_data <- training(data_split)
+table(train_data$Heart_Attack)
+
+test_data  <- testing(data_split)
+table(test_data$Heart_Attack)
+```
+The data is split into training and testing datasets using 70-30 splitting rule
+## Creating 10-fold splits
+
+```{r}
+set.seed(10)
+
+folds <- vfold_cv(train_data, v = 5, strata= Heart_Attack)
+```
+
+# Defining logistic regression model
+
+```{r}
+logistic_model <- logistic_reg() %>%
+        set_engine("glm") %>%
+        set_mode("classification") 
+```
+
+# Creating recipe
+
+```{r}
+rec <- recipe(Heart_Attack ~ ., data = data) %>%
+  step_rm(Patient_ID, Province, Hypertension) %>%  
+  step_naomit(all_predictors(), skip = TRUE) %>%
+  step_normalize(all_numeric_predictors())
+```
+
+
+# Creating a workflow
+
+```{r}
+wf <- workflow() %>%
+  add_model(logistic_model) %>%
+  add_recipe(rec)
+```
+
+# Running 10_fold cross validation
+
+```{r}
+results <- fit_resamples(
+  wf,
+  resamples = folds,
+  metrics = metric_set(accuracy, roc_auc),
+  control = control_resamples(save_pred = TRUE, verbose = TRUE)
+)
+```
+
+# Collecting the metrics
+
+```{r}
+collect_metrics(results)
+
+preds <- collect_predictions(results)
+```
+
+# Confusion Matrix (2 x 2 Table)
+
+```{r}
+conf_mat(preds, truth = Heart_Attack, estimate = .pred_class)
+```
+
+# Model Performance metrics
+
+```{r}
+metrics <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
+
+all_metrics_lr <- metrics(preds,
+               truth = Heart_Attack,
+               estimate = .pred_class, event_level = "second")
+               
+kable(all_metrics_lr)
+```
+
+# ROC Plot
+```{r}
+roc_auc(preds,
+        truth = Heart_Attack,
+        .pred_Yes)
+
+roc_curve <- preds %>%
+  roc_curve(truth = Heart_Attack, .pred_Yes) %>%
+  autoplot()
+
+plot(roc_curve)
+```
+
+## Coefficient Estimates
+
+```{r}
+
+final_model <- fit(wf, data = train_data)
+
+
+fitted_model <- final_model %>% extract_fit_engine()
+tidy(fitted_model)
+```
+
+
+# Variables Importance
+```{r}
+final_model %>%
+  extract_fit_parsnip() %>%
+  vip(num_features = 20)  
+```
+# Testing the final model on testing dataset
+```{r}
+test_preds <- predict(final_model, new_data = test_data, type = "class") %>%
+  bind_cols(test_data)
+```
+
+# Confusion metrics for testing data
+```{r}
+conf_mat(test_preds,
+         truth = Heart_Attack,
+         estimate = .pred_class)
+```
+# calculating different metrics for testing data
+```{r}
+metrics <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
+
+metrics(test_preds,
+        truth = Heart_Attack,
+        estimate = .pred_class,
+        event_level = "second")
+```
+
+
+
+## Logistic regression with up- sampling
+
+
+###Creating the Recipe
+
+```{r}
+Heart_rec_oversamp <- 
+  recipe(Heart_Attack ~ ., data = train_data) %>%
+  step_smotenc(Heart_Attack, over_ratio = 0.9) %>%
+  step_unknown() %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>% 
+  step_zv(all_predictors()) 
+```
+
+```{r}
+recipe(~., train_data) %>%
+  step_upsample(Heart_Attack, over_ratio = 0.9) %>%
+  prep() %>%
+  bake(new_data = NULL) %>%
+  ggplot(aes(Heart_Attack)) +
+  geom_bar()
+```
+# Define Logistic Regression
+```{r}
+logistic_m <- logistic_reg(
+                mode = "classification",
+                engine = "glm"
+              )
+```
+
+# Creating Workflow
+
+```{r}
+HeartAttack_wflow_oversamp <- 
+  workflow() %>% 
+  add_model(logistic_m) %>% 
+  add_recipe(Heart_rec_oversamp)
+
+HeartAttack_wflow_oversamp
+```
+
+```{r}
+Heart_fit_oversamp <- 
+  fit_resamples(
+    HeartAttack_wflow_oversamp,
+    resamples = folds,
+    metrics = metric_set(accuracy, roc_auc),
+    control = control_resamples(save_pred = TRUE, verbose = TRUE)
+  )
+```
+
+```{r}
+collect_metrics(Heart_fit_oversamp)
+```
+
+```{r}
+
+preds2 <- collect_predictions(Heart_fit_oversamp)
+
+metrics <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
+Heart_fit_oversamp_all_metrics <- metrics(preds2,
+                                          truth = Heart_Attack,
+                                          estimate = .pred_class,
+                                          event_level = "second")
+kable(Heart_fit_oversamp_all_metrics)
+```
+
+```{r}
+# ROC curve
+roc_auc(preds2, truth = Heart_Attack, .pred_Yes)
+
+preds2 %>%
+  roc_curve(truth = Heart_Attack, .pred_Yes) %>%
+  autoplot()
+```
+
+```{r}
+final_model2 <- fit(HeartAttack_wflow_oversamp, data = train_data)
+
+
+final_model2 %>%
+  extract_fit_parsnip() %>%
+  tidy() %>%
+  arrange(desc(abs(estimate)))
+```
+# Variables Importance
+```{r}
+final_model2 %>%
+  extract_fit_parsnip() %>%
+  vip(num_features = 20)  
+```
+# Testing the final model on testing dataset
+```{r}
+test_preds2 <- predict(final_model2, new_data = test_data, type = "class") %>%
+  bind_cols(test_data)
+```
+
+# Confusion metrics for testing data
+```{r}
+conf_mat(test_preds2,
+         truth = Heart_Attack,
+         estimate = .pred_class)
+```
+# calculating different metrics for testing data
+```{r}
+metrics <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
+
+metrics(test_preds2,
+        truth = Heart_Attack,
+        estimate = .pred_class,
+        event_level = "second")
+```
+# Random Forests
+
+## Loading the Libraries
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(sjPlot)
+library(C50)
+library(ranger)
+library(finalfit)
+library(knitr)
+library(gtsummary)
+library(mlbench)
+library(vip)
+library(rsample)
+library(rpart.plot)
+library(tune)
+library(recipes)
+library(yardstick)
+library(parsnip)
+library(glmnet)
+library(themis)
+library(microbenchmark)
+```
+
+```{r}
+### Set the number of cores on your computer
+cores <- parallel::detectCores()
+cores
+```
+
+# Defining Random forest
+```{r}
+rf_model <- rand_forest(mtry = tune(), min_n = tune(), trees = 100) %>% 
+              set_engine("ranger", num.threads = cores) %>% 
+              set_mode("classification")
+```
+
+```{r}
+heartattack_recipe <- 
+  recipe(Heart_Attack ~ ., data = train_data) %>%
+  step_rm(Patient_ID, Province) %>%  
+  step_zv(all_predictors())
+```
+
+```{r}
+heartattack_workflow <- 
+        workflow() %>% 
+        add_model(rf_model) %>% 
+        add_recipe(heartattack_recipe)
+
+heartattack_workflow
+```
+
+```{r}
+set.seed(100)
+
+folds <- vfold_cv(train_data, v = 10) 
+
+rf_grid <- grid_regular(
+              mtry(range = c(5, 25)),
+              min_n(range = c(5, 50)),
+              levels = 5  
+            )
+
+rf_grid
+```
+
+```{r}
+heartattack_fit <- tune_grid(
+                heartattack_workflow,
+                resamples = folds,
+                grid = rf_grid, 
+                control = control_resamples(save_pred = TRUE, 
+                                                  verbose = FALSE))
+
+heartattack_fit
+```
+
+```{r}
+heartattack_fit %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  select(mean, min_n, mtry) %>%
+  pivot_longer(min_n:mtry,
+    values_to = "value",
+    names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "Accuracy")
+```
+
+### Collect the results
+
+```{r}
+rf_best <- 
+  heartattack_fit %>% 
+  select_best(metric = "accuracy")
+
+rf_best
+
+rf_auc_fit <- 
+  heartattack_fit %>% 
+  collect_predictions(parameters = rf_best) 
+```
+
+```{r}
+conf_mat(rf_auc_fit, truth = Heart_Attack,
+         estimate = .pred_class)
+```
+# Model Performance metrics
+```{r}
+metrics2 <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
+
+all_metrics_lr2 <- metrics2(rf_auc_fit,
+               truth = Heart_Attack,
+               estimate = .pred_class, event_level = "second")
+               
+kable(all_metrics_lr2)
+```
+```{r}
+auc_result <- roc_auc(
+  rf_auc_fit,
+  truth = Heart_Attack,
+  .pred_Yes,
+  event_level = "second"
+)
+rf_auc_fit %>%
+  roc_curve(truth = Heart_Attack, .pred_Yes) %>%
+  autoplot()
+```
+## Up-Sampling
+
+```{r}
+### Set the number of cores on your computer
+cores <- parallel::detectCores()
+cores
+```
+
+```{r}
+Heart_rec_oversamp_rf2 <- 
+  recipe(Heart_Attack ~ ., data = train_data) %>%
+  step_rm(Patient_ID, Province) %>%  
+  step_unknown() %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_zv(all_predictors()) %>%
+  step_smotenc(Heart_Attack, over_ratio = 0.9)
+```
+
+```{r}
+rf_model <- rand_forest(mtry = tune(), min_n = tune(), trees = 100) %>% 
+              set_engine("ranger", num.threads = cores) %>% 
+              set_mode("classification")
+```
+
+```{r}
+# Workflow
+HeartAttack_wflow_oversamp_rf <- 
+  workflow() %>%
+  add_model(rf_model) %>%
+  add_recipe(Heart_rec_oversamp_rf2)
+
+HeartAttack_wflow_oversamp_rf
+```
+
+```{r}
+
+rf_grid <- grid_regular(
+  mtry(range = c(5, 25)),
+  min_n(range = c(5, 50)),
+  levels = 5
+)
+```
+
+```{r}
+rf_results <- tune_grid(
+  HeartAttack_wflow_oversamp_rf,
+  resamples = folds,
+  grid = rf_grid,
+  metrics = metric_set(accuracy, roc_auc),
+  control = control_grid(save_pred = TRUE)
+)
+```
+
+```{r}
+rf_results %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  select(mean, min_n, mtry) %>%
+  pivot_longer(min_n:mtry,
+    values_to = "value",
+    names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "Accuracy")
+```
+
