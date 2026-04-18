@@ -743,18 +743,25 @@ cores
 ```
 
 # Defining Random forest
+
 ```{r}
 rf_model <- rand_forest(mtry = tune(), min_n = tune(), trees = 100) %>% 
               set_engine("ranger", num.threads = cores) %>% 
               set_mode("classification")
 ```
 
+# Creating the recipe
+
 ```{r}
 heartattack_recipe <- 
   recipe(Heart_Attack ~ ., data = train_data) %>%
-  step_rm(Patient_ID, Province) %>%  
+  step_rm(Patient_ID, Province, Hypertension) %>%  
+   step_dummy(all_nominal_predictors()) %>%   
+   step_normalize(all_numeric_predictors()) %>%   
   step_zv(all_predictors())
 ```
+
+# Creating workflow
 
 ```{r}
 heartattack_workflow <- 
@@ -766,9 +773,9 @@ heartattack_workflow
 ```
 
 ```{r}
-set.seed(100)
+set.seed(10)
 
-folds <- vfold_cv(train_data, v = 10) 
+folds <- vfold_cv(train_data, v = 5) 
 
 rf_grid <- grid_regular(
               mtry(range = c(5, 25)),
@@ -785,7 +792,7 @@ heartattack_fit <- tune_grid(
                 resamples = folds,
                 grid = rf_grid, 
                 control = control_resamples(save_pred = TRUE, 
-                                                  verbose = FALSE))
+                                                  verbose = TRUE))
 
 heartattack_fit
 ```
@@ -818,7 +825,7 @@ rf_auc_fit <-
   heartattack_fit %>% 
   collect_predictions(parameters = rf_best) 
 ```
-
+# Confusion matrix
 ```{r}
 conf_mat(rf_auc_fit, truth = Heart_Attack,
          estimate = .pred_class)
@@ -833,6 +840,8 @@ all_metrics_lr2 <- metrics2(rf_auc_fit,
                
 kable(all_metrics_lr2)
 ```
+
+# ROC-AUC for random forest
 ```{r}
 auc_result <- roc_auc(
   rf_auc_fit,
@@ -844,6 +853,70 @@ rf_auc_fit %>%
   roc_curve(truth = Heart_Attack, .pred_Yes) %>%
   autoplot()
 ```
+## Final model
+
+```{r}
+final_modelRF <- finalize_model(
+                  rf_model,
+                  rf_best
+                )
+
+final_modelRF
+```
+### Variable Importance
+
+```{r}
+tree_prep <- prep(heartattack_recipe)
+
+final_modelRF %>%
+  set_engine("ranger", importance = "permutation") %>%
+  fit(Heart_Attack ~ .,
+    data = juice(tree_prep)) %>%
+  vip(geom = "point")
+```
+
+### Final Model Fit
+
+```{r}
+final_rf_workflow <- workflow() %>%
+                      add_recipe(heartattack_recipe) %>%
+                      add_model(final_modelRF)
+
+final_resultsRF <- final_rf_workflow %>%
+                    last_fit(data_split)
+
+final_resultsRF %>%
+  collect_metrics()
+```
+# Collecting the predictions
+```{r}
+rf_predictions <- final_resultsRF %>%
+  collect_predictions()
+```
+
+# Confusion matrix
+```{r}
+rf_predictions %>%
+  conf_mat(truth = Heart_Attack, estimate = .pred_class)
+```
+
+
+# Metrics for Random forest tested on testing data
+```{r}
+
+metricsRF <- metric_set(accuracy, sensitivity, specificity, 
+                         ppv, npv, f_meas)
+
+all_metrics_RF <- metricsRF(rf_predictions,
+               truth = Heart_Attack,
+               estimate = .pred_class, event_level = "second")
+               
+kable(all_metrics_RF)
+```
+
+
+
+
 ## Up-Sampling
 
 ```{r}
