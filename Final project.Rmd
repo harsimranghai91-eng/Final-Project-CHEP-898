@@ -8,24 +8,24 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
+My github link is https://github.com/harsimranghai91-eng/Final-Project-CHEP-898.git.
 
 # Introduction to the project
-Myocardial infarction occurs due to decrease in blood supply to the myocardium (Heart Muscles), commonly due to obstruction in the coronary arteries. The risk factors for MI are as follows: Smoking, alcohol intake, sociodemographic factors, diet, increase level of homocysteine, diabetes, hypertension, high cholesterol, sedentary lifestyle, obesity. The global prevalence of MI is 3.8% for people age  less than 60 and 9.5% for people greater than 60 years of age.
+Myocardial infarction occurs due to decrease in blood supply to the myocardium (Heart Muscles), commonly due to obstruction in the coronary arteries. The risk factors for MI are as follows: Smoking, alcohol intake, sociodemographic factors, diet, increase level of homocysteine, diabetes, hypertension, high cholesterol, sedentary lifestyle, obesity (1). The global prevalence of MI is 3.8% for people age  less than 60 and 9.5% for people greater than 60 years of age (2). Given, its global burden, it is imperative to create a predictive model that can predict the person risk of having the heart attack based on certain features.
 
 # Objectives of this study 
 The main objective of this study is to create different predictive models for predicting myocardial infarction (Heart attack). The best machine learning model will be selected based on different criterias (Refer to model selection in methodology section)
 
 # Methodology
 
-## dataset
+## Dataset
 Heart disease dataset from kaggle was used for this project. The link to the project is as follows:https://www.kaggle.com/datasets/ankushpanday2/heart-attack-risk-dataset-of-china. This dataset is based on chinese population and consist of 239266 observations and consist of 28 features (Predictors).
 
 ## Statistical methods
-### machine Learning models
-Four different classification machine learning models was created that is logistic regression, logistic regression with up-sampling, random forest and random forest with up- sampling. The reason behind using random forest rather than decision tree is that decision tree even though easy to interpret tend to underperform in comparison to logistics regression models, that why ensemble method (random forest) is used. Additionally, the reason behind using up-sampling is the vast proportion difference of people with heart attack and without heart attack in this dataset.
+### Machine Learning models
+Four different classification machine learning models was created that is logistic regression, logistic regression with up-sampling, random forest and random forest with up- sampling. The reason behind using random forest rather than decision tree is that decision tree even though easy to interpret tend to underperform in comparison to logistics regression models, that why ensemble method (random forest) is used. Additionally, the reason behind using up-sampling is the vast proportion difference of people with heart attack and without heart attack in this dataset.The up-sampling tend to balance such difference. 
 
-The recipe was created such that variables that are irrelevant such as patientID, province, and hypertension status were removed. The hypertension was removed as we continuous blood pressure measurements which improves the power of the model in comparison to using only categorical variable. Listwise deletion was perform to remove observations with missing variables information. Additionally,the dummy coding of the categorical  variables that have more than two levels was done. Further, predictors with non zero variance and numeric predictor that are highly related were deleted (if any).
+The recipe was created such that variables that are irrelevant such as patientID, province, and hypertension status were removed. The hypertension was removed as we have continuous blood pressure measurements which improves the power of the model in comparison to using only hypertension categorical variable. Listwise deletion was perform to remove observations with missing variables information. Additionally,the dummy coding of the categorical  variables that have more than two levels was done. Further, predictors with non zero variance and numeric predictor that are highly related were deleted (if any).
 
 ### Validation of the models
 The data was split into train and testing dataset. To find the optimal hyperparameters, 10- fold cross validation was used where the training data was split into five fold. In each iteration, the model was fit on the nine folds with the remaining fold used as the validation set.  This approach ensures that the each folds act as the validation set exactly once. Once the hyperparameters are known, the model is fitted on the entire training data and its predictive performance tested on the testing data.
@@ -1152,3 +1152,7 @@ The top 5 variables that are found to be most important in random forest with up
 
 # Conclusion
 Logistic regression with up-sampling performs fair among the four models. Given the low scores of performance metrics for the logistic regression with up-sampling, it is possible that other classification models such as artifical neural networks, linear or quadratic discriminant analysis, or bayesian classification approaches may perform better in classifying people with heart disaese from people without the heart disease.
+
+# References
+1. Kasper D, Fauci A, Hauser S, Longo D, Jameson J, Loscalzo J. Harrison's principles of internal medicine, 19e. New York, NY, USA:: Mcgraw-hill; 2015.
+2. Salari N, Morddarvanjoghi F, Abdolmaleki A, Rasoulpoor S, Khaleghi AA, Hezarkhani LA, Shohaimi S, Mohammadi M. The global prevalence of myocardial infarction: a systematic review and meta-analysis. BMC cardiovascular disorders. 2023 Apr 22;23(1):206.
