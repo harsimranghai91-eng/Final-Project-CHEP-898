@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 # Introduction to the project
 Myocardial infarction occurs due to decrease in blood supply to the myocardium (Heart Muscles), commonly due to obstruction in the coronary arteries. The risk factors for MI are as follows: Smoking, alcohol intake, sociodemographic factors, diet, increase level of homocysteine, diabetes, hypertension, high cholesterol, sedentary lifestyle, obesity. The global prevalence of MI is 3.8% for people age  less than 60 and 9.5% for people greater than 60 years of age.
 
@@ -22,13 +23,15 @@ Heart disease dataset from kaggle was used for this project. The link to the pro
 
 ## Statistical methods
 ### machine Learning models
-Three different classification machine learning models will be created that is logistic regression, random forest and artificial neural network (Single layer and two layer).The reason behind using random forest rather than decision tree is that decision tree even though easy to interpret tend to underperform in comparison to logistics regression models, that why ensemble method (random forest) is used.
+Four different classification machine learning models was created that is logistic regression, logistic regression with up-sampling, random forest and random forest with up- sampling. The reason behind using random forest rather than decision tree is that decision tree even though easy to interpret tend to underperform in comparison to logistics regression models, that why ensemble method (random forest) is used. Additionally, the reason behind using up-sampling is the vast proportion difference of people with heart attack and without heart attack in this dataset.
+
+The recipe was created such that variables that are irrelevant such as patientID, province, and hypertension status were removed. The hypertension was removed as we continuous blood pressure measurements which improves the power of the model in comparison to using only categorical variable. Listwise deletion was perform to remove observations with missing variables information. Additionally,the dummy coding of the categorical  variables that have more than two levels was done. Further, predictors with non zero variance and numeric predictor that are highly related were deleted (if any).
 
 ### Validation of the models
-Ten fold cross validation approach will be used to test the trained model. The reason behind using 10-fold cross validation in comparison to the validation set approach is is that 10-fold cross validation has lower variance in comparison to the validation set as every observation is used for validation and training and this approach is better use of the dataset. 
+The data was split into train and testing dataset. To find the optimal hyperparameters, 10- fold cross validation was used where the training data was split into five fold. In each iteration, the model was fit on the nine folds with the remaining fold used as the validation set.  This approach ensures that the each folds act as the validation set exactly once. Once the hyperparameters are known, the model is fitted on the entire training data and its predictive performance tested on the testing data.
 
 ### Model comparison
-The performance of each model will be compared using the following criteria : Accuracy, sensitivity, specificity, ROC-AUC and F1 Score. The model with the high score for the parameters will be selected as the best predictive model.
+The performance of each model was compared using the following criteria : Accuracy, sensitivity, specificity, precision, and F1 Score. The model with the high score for the parameters will be selected as the best predictive model.
 
 ### Variable Information
 
@@ -97,13 +100,11 @@ library(forestmodel)
 ```
 
 ## Taking a look into data set
-
 ```{r}
 glimpse(data)
 ```
 
 ## Checking duplicate observations
-
 ```{r}
 sum(duplicated(data))
 ```
@@ -111,20 +112,17 @@ sum(duplicated(data))
 No duplicated observation were observed in this dataset.
 
 ## Checking the missing data
-
 ```{r}
 any(is.na(data))
 ```
 No missing data was found in this data set, so we don't need to do anything for the missing data.
 
 ## Checking the structure of the data set
-
 ```{r}
 str(data)
 ```
 
 ## Changing the Structure of variables
-
 ```{r}
 data <- data%>%mutate(across(c( Gender,
                                 Smoking_Status,
@@ -153,7 +151,6 @@ data <- data%>%mutate(across(c( Gender,
 ```
 
 ## Descriptive Analysis
-
 ```{r}
 rm_covsum(
   data = data,
@@ -184,7 +181,6 @@ rm_covsum(
 ```
 
 ## Bar Graphs
-
 ```{r}
 ggplot(data, aes(x = Diabetes, fill = Heart_Attack)) +
   geom_bar(position = "dodge") +
@@ -458,8 +454,9 @@ library(themis)
 library(microbenchmark)
 ```
 
-## Data Split
 
+
+### Data Split
 ```{r}
 set.seed(10)
 
@@ -471,68 +468,73 @@ table(train_data$Heart_Attack)
 test_data  <- testing(data_split)
 table(test_data$Heart_Attack)
 ```
-The data is split into training and testing datasets using 70-30 splitting rule
-## Creating 10-fold splits
+The data is split into training and testing datasets using 70-30 splitting rule.
 
+### Creating 10-fold splits
 ```{r}
 set.seed(10)
 
-folds <- vfold_cv(train_data, v = 5, strata= Heart_Attack)
+folds <- vfold_cv(train_data, v = 10, strata= Heart_Attack)
 ```
 
-# Defining logistic regression model
+### Setting the reference of dependent variable
+```{r}
+train_data$Heart_Attack <- relevel(factor(train_data$Heart_Attack), ref = "No")
+```
 
+### Defining logistic regression model
 ```{r}
 logistic_model <- logistic_reg() %>%
-        set_engine("glm") %>%
+        set_engine("glm", control= list(maxit=200)) %>%
         set_mode("classification") 
 ```
 
-# Creating recipe
-
+### Creating recipe
 ```{r}
-rec <- recipe(Heart_Attack ~ ., data = data) %>%
+rec <- recipe(Heart_Attack ~ ., data = train_data) %>%
   step_rm(Patient_ID, Province, Hypertension) %>%  
   step_naomit(all_predictors(), skip = TRUE) %>%
+  step_nzv(all_predictors()) %>%  
+  step_corr(all_numeric_predictors(), threshold = 0.9) %>% 
+  step_dummy(all_nominal_predictors()) %>%
   step_normalize(all_numeric_predictors())
 ```
 
 
-# Creating a workflow
-
+### Creating a workflow
 ```{r}
 wf <- workflow() %>%
   add_model(logistic_model) %>%
   add_recipe(rec)
 ```
 
-# Running 10_fold cross validation
 
+
+### Running 10_fold cross validation
 ```{r}
 results <- fit_resamples(
   wf,
   resamples = folds,
   metrics = metric_set(accuracy, roc_auc),
-  control = control_resamples(save_pred = TRUE, verbose = TRUE)
+  control = control_resamples(save_pred = TRUE, verbose = FALSE)
 )
 ```
 
-# Collecting the metrics
-
+### Collecting the metrics
 ```{r}
 collect_metrics(results)
 
 preds <- collect_predictions(results)
 ```
+The average accurcacy is 87.85% and average roc-auc is 49.77% respectively.
 
-# Confusion Matrix (2 x 2 Table)
-
+### Confusion Matrix (2 x 2 Table)
 ```{r}
 conf_mat(preds, truth = Heart_Attack, estimate = .pred_class)
 ```
+The model fails to predict anyone with heart attack, but accurately predict those without the heart attack.
 
-# Model Performance metrics
-
+### Model Performance metrics
 ```{r}
 metrics <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
 
@@ -543,7 +545,7 @@ all_metrics_lr <- metrics(preds,
 kable(all_metrics_lr)
 ```
 
-# ROC Plot
+### ROC Plot
 ```{r}
 roc_auc(preds,
         truth = Heart_Attack,
@@ -556,8 +558,7 @@ roc_curve <- preds %>%
 plot(roc_curve)
 ```
 
-## Coefficient Estimates
-
+### Coefficient Estimates
 ```{r}
 
 final_model <- fit(wf, data = train_data)
@@ -568,25 +569,29 @@ tidy(fitted_model)
 ```
 
 
-# Variables Importance
+### Variables Importance
 ```{r}
 final_model %>%
   extract_fit_parsnip() %>%
   vip(num_features = 20)  
 ```
-# Testing the final model on testing dataset
+The top 5 variables that are found to be most important in logistic regression are Low cholesterol level, poor diet score, low stress level, middle income level and unemployed.
+
+### Testing the final model on testing dataset
 ```{r}
 test_preds <- predict(final_model, new_data = test_data, type = "class") %>%
   bind_cols(test_data)
 ```
 
-# Confusion metrics for testing data
+### Confusion metrics for testing data
 ```{r}
 conf_mat(test_preds,
          truth = Heart_Attack,
          estimate = .pred_class)
 ```
-# calculating different metrics for testing data
+The final model fails to predict anyone with heart attack, but accurately predict those without the heart attack.
+
+### calculating different metrics for testing data
 ```{r}
 metrics <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
 
@@ -596,21 +601,18 @@ metrics(test_preds,
         event_level = "second")
 ```
 
-
-
 ## Logistic regression with up- sampling
 
-
 ###Creating the Recipe
-
 ```{r}
 Heart_rec_oversamp <- 
   recipe(Heart_Attack ~ ., data = train_data) %>%
+  step_rm(Patient_ID, Province, Hypertension) %>%
   step_smotenc(Heart_Attack, over_ratio = 0.9) %>%
-  step_unknown() %>%
   step_dummy(all_nominal_predictors()) %>%
   step_normalize(all_numeric_predictors()) %>% 
-  step_zv(all_predictors()) 
+  step_corr(all_numeric_predictors(), threshold = 0.9) %>%
+  step_nzv(all_predictors()) 
 ```
 
 ```{r}
@@ -621,7 +623,7 @@ recipe(~., train_data) %>%
   ggplot(aes(Heart_Attack)) +
   geom_bar()
 ```
-# Define Logistic Regression
+### Define Logistic Regression
 ```{r}
 logistic_m <- logistic_reg(
                 mode = "classification",
@@ -629,7 +631,7 @@ logistic_m <- logistic_reg(
               )
 ```
 
-# Creating Workflow
+### Creating Workflow
 
 ```{r}
 HeartAttack_wflow_oversamp <- 
@@ -639,21 +641,23 @@ HeartAttack_wflow_oversamp <-
 
 HeartAttack_wflow_oversamp
 ```
-
+### ### Running 10-fold cross validation
 ```{r}
 Heart_fit_oversamp <- 
   fit_resamples(
     HeartAttack_wflow_oversamp,
     resamples = folds,
     metrics = metric_set(accuracy, roc_auc),
-    control = control_resamples(save_pred = TRUE, verbose = TRUE)
+    control = control_resamples(save_pred = TRUE, verbose = FALSE)
   )
 ```
 
+### Collecting the results
 ```{r}
 collect_metrics(Heart_fit_oversamp)
 ```
 
+### Model performance metrics
 ```{r}
 
 preds2 <- collect_predictions(Heart_fit_oversamp)
@@ -666,8 +670,8 @@ Heart_fit_oversamp_all_metrics <- metrics(preds2,
 kable(Heart_fit_oversamp_all_metrics)
 ```
 
+### ROC Curve
 ```{r}
-# ROC curve
 roc_auc(preds2, truth = Heart_Attack, .pred_Yes)
 
 preds2 %>%
@@ -675,6 +679,7 @@ preds2 %>%
   autoplot()
 ```
 
+### Fitting the final model on entire training data
 ```{r}
 final_model2 <- fit(HeartAttack_wflow_oversamp, data = train_data)
 
@@ -684,25 +689,28 @@ final_model2 %>%
   tidy() %>%
   arrange(desc(abs(estimate)))
 ```
-# Variables Importance
+
+### Variables Importance
 ```{r}
 final_model2 %>%
   extract_fit_parsnip() %>%
   vip(num_features = 20)  
 ```
-# Testing the final model on testing dataset
+
+### Testing the final model on testing dataset
 ```{r}
 test_preds2 <- predict(final_model2, new_data = test_data, type = "class") %>%
   bind_cols(test_data)
 ```
 
-# Confusion metrics for testing data
+### Confusion metrics for testing data
 ```{r}
 conf_mat(test_preds2,
          truth = Heart_Attack,
          estimate = .pred_class)
 ```
-# calculating different metrics for testing data
+
+### calculating different metrics for testing data
 ```{r}
 metrics <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
 
@@ -711,9 +719,10 @@ metrics(test_preds2,
         estimate = .pred_class,
         event_level = "second")
 ```
-# Random Forests
 
-## Loading the Libraries
+## Random Forests
+
+### Loading the Libraries
 ```{r}
 library(tidyverse)
 library(tidymodels)
@@ -736,33 +745,32 @@ library(themis)
 library(microbenchmark)
 ```
 
+### Setting the cores for fast computation
 ```{r}
 ### Set the number of cores on your computer
 cores <- parallel::detectCores()
 cores
 ```
 
-# Defining Random forest
-
+### Defining Random forest
 ```{r}
 rf_model <- rand_forest(mtry = tune(), min_n = tune(), trees = 100) %>% 
               set_engine("ranger", num.threads = cores) %>% 
               set_mode("classification")
 ```
 
-# Creating the recipe
-
+### Creating the recipe
 ```{r}
 heartattack_recipe <- 
   recipe(Heart_Attack ~ ., data = train_data) %>%
   step_rm(Patient_ID, Province, Hypertension) %>%  
    step_dummy(all_nominal_predictors()) %>%   
    step_normalize(all_numeric_predictors()) %>%   
-  step_zv(all_predictors())
+  step_corr(all_numeric_predictors(), threshold = 0.9) %>%
+  step_nzv(all_predictors())
 ```
 
-# Creating workflow
-
+### Creating workflow
 ```{r}
 heartattack_workflow <- 
         workflow() %>% 
@@ -772,10 +780,11 @@ heartattack_workflow <-
 heartattack_workflow
 ```
 
+### creating 10-folds and creating grid to find optimal hyperparameters
 ```{r}
 set.seed(10)
 
-folds <- vfold_cv(train_data, v = 5) 
+folds <- vfold_cv(train_data, v = 10) 
 
 rf_grid <- grid_regular(
               mtry(range = c(5, 25)),
@@ -786,17 +795,19 @@ rf_grid <- grid_regular(
 rf_grid
 ```
 
+### Running the random forest model
 ```{r}
 heartattack_fit <- tune_grid(
                 heartattack_workflow,
                 resamples = folds,
                 grid = rf_grid, 
                 control = control_resamples(save_pred = TRUE, 
-                                                  verbose = TRUE))
+                                                  verbose = FALSE))
 
 heartattack_fit
 ```
 
+### Graph showing accuracy as a function of min_n and mtry
 ```{r}
 heartattack_fit %>%
   collect_metrics() %>%
@@ -813,7 +824,6 @@ heartattack_fit %>%
 ```
 
 ### Collect the results
-
 ```{r}
 rf_best <- 
   heartattack_fit %>% 
@@ -825,12 +835,16 @@ rf_auc_fit <-
   heartattack_fit %>% 
   collect_predictions(parameters = rf_best) 
 ```
-# Confusion matrix
+The optimal tuning parameters are mtry =5 (each split, only 5 random predictors are considered) and min_n = 5 (each node must have atleast 5 observations to split further).
+
+### Confusion matrix
 ```{r}
 conf_mat(rf_auc_fit, truth = Heart_Attack,
          estimate = .pred_class)
 ```
-# Model Performance metrics
+The model fails to predict  anyone with the heart attack, but perform well to predict those without the heart attack.
+
+### Model Performance metrics
 ```{r}
 metrics2 <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
 
@@ -841,7 +855,7 @@ all_metrics_lr2 <- metrics2(rf_auc_fit,
 kable(all_metrics_lr2)
 ```
 
-# ROC-AUC for random forest
+### ROC-AUC for random forest
 ```{r}
 auc_result <- roc_auc(
   rf_auc_fit,
@@ -853,8 +867,8 @@ rf_auc_fit %>%
   roc_curve(truth = Heart_Attack, .pred_Yes) %>%
   autoplot()
 ```
-## Final model
 
+### Final model
 ```{r}
 final_modelRF <- finalize_model(
                   rf_model,
@@ -863,8 +877,8 @@ final_modelRF <- finalize_model(
 
 final_modelRF
 ```
-### Variable Importance
 
+### Variable Importance
 ```{r}
 tree_prep <- prep(heartattack_recipe)
 
@@ -875,8 +889,7 @@ final_modelRF %>%
   vip(geom = "point")
 ```
 
-### Final Model Fit
-
+### Fitting the final model using the optimal hyperparameters and testing the peformance on testing data
 ```{r}
 final_rf_workflow <- workflow() %>%
                       add_recipe(heartattack_recipe) %>%
@@ -888,24 +901,24 @@ final_resultsRF <- final_rf_workflow %>%
 final_resultsRF %>%
   collect_metrics()
 ```
-# Collecting the predictions
+
+### Collecting the predictions
 ```{r}
 rf_predictions <- final_resultsRF %>%
   collect_predictions()
 ```
 
-# Confusion matrix
+### Confusion matrix based on testing data
 ```{r}
 rf_predictions %>%
   conf_mat(truth = Heart_Attack, estimate = .pred_class)
 ```
+The model fails to predict  anyone with the heart attack, but perform well to predict those without the heart attack.
 
-
-# Metrics for Random forest tested on testing data
+### Metrics for Random forest based on testing data
 ```{r}
 
-metricsRF <- metric_set(accuracy, sensitivity, specificity, 
-                         ppv, npv, f_meas)
+metricsRF <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
 
 all_metrics_RF <- metricsRF(rf_predictions,
                truth = Heart_Attack,
@@ -915,35 +928,48 @@ kable(all_metrics_RF)
 ```
 
 
-
-
-## Up-Sampling
-
+### ROC-AUC for random forest
 ```{r}
-### Set the number of cores on your computer
+auc_result2 <- roc_auc(
+  rf_predictions,
+  truth = Heart_Attack,
+  .pred_Yes,
+  event_level = "second"
+)
+rf_predictions %>%
+  roc_curve(truth = Heart_Attack, .pred_Yes) %>%
+  autoplot()
+```
+
+## Random forest for up sampling
+
+### Setting the cores for fast computation
+```{r}
 cores <- parallel::detectCores()
 cores
 ```
 
+### Creating the Recipe
 ```{r}
 Heart_rec_oversamp_rf2 <- 
   recipe(Heart_Attack ~ ., data = train_data) %>%
-  step_rm(Patient_ID, Province) %>%  
-  step_unknown() %>%
+  step_rm(Patient_ID, Province, Hypertension) %>%  
   step_dummy(all_nominal_predictors()) %>%
   step_normalize(all_numeric_predictors()) %>%
-  step_zv(all_predictors()) %>%
+  step_nzv(all_predictors()) %>%
+  step_corr(all_numeric_predictors(), threshold = 0.9) %>%
   step_smotenc(Heart_Attack, over_ratio = 0.9)
 ```
 
+### Defining the Random forest
 ```{r}
 rf_model <- rand_forest(mtry = tune(), min_n = tune(), trees = 100) %>% 
               set_engine("ranger", num.threads = cores) %>% 
               set_mode("classification")
 ```
 
+### Creating the workflow
 ```{r}
-# Workflow
 HeartAttack_wflow_oversamp_rf <- 
   workflow() %>%
   add_model(rf_model) %>%
@@ -951,9 +977,8 @@ HeartAttack_wflow_oversamp_rf <-
 
 HeartAttack_wflow_oversamp_rf
 ```
-
+### Tuning the parameters
 ```{r}
-
 rf_grid <- grid_regular(
   mtry(range = c(5, 25)),
   min_n(range = c(5, 50)),
@@ -961,18 +986,19 @@ rf_grid <- grid_regular(
 )
 ```
 
+### Running the model
 ```{r}
-rf_results <- tune_grid(
+rfoversamp_results <- tune_grid(
   HeartAttack_wflow_oversamp_rf,
   resamples = folds,
   grid = rf_grid,
-  metrics = metric_set(accuracy, roc_auc),
-  control = control_grid(save_pred = TRUE)
-)
+  control = control_resamples(save_pred = TRUE, 
+                                                  verbose = FALSE))
+  
 ```
-
+### Graph showing accuracy as a function of min_n and mtry
 ```{r}
-rf_results %>%
+rfoversamp_results %>%
   collect_metrics() %>%
   filter(.metric == "accuracy") %>%
   select(mean, min_n, mtry) %>%
@@ -986,3 +1012,143 @@ rf_results %>%
   labs(x = NULL, y = "Accuracy")
 ```
 
+### Collecting the results
+```{r}
+rf_best2 <- 
+  rfoversamp_results %>% 
+  select_best(metric = "accuracy")
+
+rf_best2
+
+rf_auc_fit2 <- 
+  rfoversamp_results %>% 
+  collect_predictions(parameters = rf_best2) 
+```
+The optimal tuning parameters are mtry =5 (each split, only 5 random predictors are considered) and min_n = 5 (each node must have atleast 5 observations to split further).
+
+### Confusion matrix
+```{r}
+conf_mat(rf_auc_fit2, truth = Heart_Attack,
+         estimate = .pred_class)
+```
+
+### Model Performance metrics
+```{r}
+metricsRFU <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
+
+all_metrics_RFU <- metricsRFU(rf_auc_fit2,
+               truth = Heart_Attack,
+               estimate = .pred_class, event_level = "second")
+               
+kable(all_metrics_RFU)
+```
+
+### ROC-AUC for random forest
+```{r}
+auc_result2 <- roc_auc(
+  rf_auc_fit2,
+  truth = Heart_Attack,
+  .pred_Yes,
+  event_level = "second"
+)
+rf_auc_fit2 %>%
+  roc_curve(truth = Heart_Attack, .pred_Yes) %>%
+  autoplot()
+```
+
+### Selecting the best model
+```{r}
+final_modelRFU <- finalize_model(
+                  rf_model,
+                  rf_best2
+                )
+
+final_modelRFU
+```
+
+### Variable Importance
+```{r}
+tree_prep2 <- prep(Heart_rec_oversamp_rf2)
+
+final_modelRFU %>%
+  set_engine("ranger", importance = "permutation") %>%
+  fit(Heart_Attack ~ .,
+    data = juice(tree_prep2)) %>%
+  vip(geom = "point")
+```
+
+### Fitting the final model using the optimal hyperparameters and testing the peformance on testing data
+```{r}
+final_rfu_workflow <- workflow() %>%
+                      add_recipe(Heart_rec_oversamp_rf2) %>%
+                      add_model(final_modelRFU)
+
+final_resultsRFU <- final_rfu_workflow %>%
+                    last_fit(data_split)
+
+final_resultsRFU %>%
+  collect_metrics()
+```
+
+### Collecting the predictions
+```{r}
+rfu_predictions <- final_resultsRFU %>%
+  collect_predictions()
+```
+
+### Confusion matrix based on testing dataset
+```{r}
+rfu_predictions %>%
+  conf_mat(truth = Heart_Attack, estimate = .pred_class)
+```
+
+
+### Metrics for Random forest based on testing data
+```{r}
+
+metricsRFU <- metric_set(accuracy, sens, spec, precision, recall, f_meas)
+
+all_metrics_RFU <- metricsRFU(rf_predictions,
+               truth = Heart_Attack,
+               estimate = .pred_class, event_level = "second")
+               
+kable(all_metrics_RFU)
+```
+
+### ROC-AUC for random forest based on testing dataset
+```{r}
+auc_resultRFU <- roc_auc(
+  rfu_predictions,
+  truth = Heart_Attack,
+  .pred_Yes,
+  event_level = "second"
+)
+rfu_predictions %>%
+  roc_curve(truth = Heart_Attack, .pred_Yes) %>%
+  autoplot()
+```
+
+# Discussion
+## Model
+For all four model, similar approach was used, where the data was portioned into training and testing data. 10- fold cross validation was done on the training data to find the hyperparameters and once the best hyperparameters are known final model is fitted on the entire training data and then its predictive performance is tested on the testing data.
+
+## Model comparison 
+Based on confusion matrix, it is apparent that logistic regression, random forest and random forest with up sampling performs well to detect people with no heart attack, but perform worst to detect people with the heart attack. The only model which perform fair in detecting people with heart attack is the logistic regression with up-sampling. The Random forest with up sampling did detect one person with heart disease when the results of cross validation was put into confusion matrix. However when fitted final model was tested on the testing data, it failed to detect any person with heart disease. 
+
+The sensitivity and specificity of the logistic regression model with Up-sampling is 0.405 and 0.595 respectively, whereas for other models, the specificity is 1 and the sensitivity is zero. Similar difference can be seen in terms of precision, recall, accuracy and F-measures  with logistic regression with up sampling performing better in those parameters. To conclude, logistic regression with up- sampling is the best model among the four, even though its performance is also modest. It is possible that other models such as linear discriminant analysis, quadratic discriminant analysis, naives bayes, bayesian additive regression trees or artificial neural network may perform better than our four models.
+
+## Variable importance
+### Logistic Regression 
+The top 5 variables that are found to be most important in logistic regression are Low cholesterol level, poor diet score, low stress level, middle income level and unemployed.
+
+### Logistic Regression with Up-sampling
+The top 5 variables that are found to be most important in logistic regression with up-sampling are Previous heart attack, having diabetes, chronic kidney disease and stroke, Medium air pollution exposure.
+
+### Random Forest
+The top 5 variables that are found to be most important in random forest are medium air pollution exposure, TCM usage, low air pollution exposure, low cholesterol level and low income level.
+
+### Random Forest with Up-sampling 
+The top 5 variables that are found to be most important in random forest with up-sampling  are family history of CVD, TCM usage, alcohol consumption, obesity and being urban residence.
+
+# Conclusion
+Logistic regression with up-sampling performs fair among the four models. Given the low scores of performance metrics for the logistic regression with up-sampling, it is possible that other classification models such as artifical neural networks, linear or quadratic discriminant analysis, or bayesian classification approaches may perform better in classifying people with heart disaese from people without the heart disease.
